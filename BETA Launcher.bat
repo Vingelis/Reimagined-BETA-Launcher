@@ -334,14 +334,14 @@ CLS
 ECHO.
 ECHO ------------- Two Skill Points Per Level -------------
 ECHO.
-ECHO Characters gain 2 skill points per level instead of 1.
+ECHO Characters gain 2 Skill Points and 8 Attribute Points per level instead of 1 Skill Point and 5 Attribute Points.
 ECHO.
 ECHO Disclaimers:
 ECHO    This change does not work retroactively.
-ECHO    Skill points already earned cannot be modified.
-ECHO    If you uninstall this change characters will return to earning 1 skill point per level.
-ECHO    Using a Token of Absolution to reset your character will refund all skill points
-ECHO    earned up to that point (whether 1 or 2 points).
+ECHO    Skill and Attribute Points already earned cannot be modified.
+ECHO    If you uninstall this change characters will return to earning 1 Skill Point and 5 Attribute Points per level.
+ECHO    Using a Token of Absolution to reset your character will refund all accumulated Skill Points and Attribute Points
+ECHO    earned up to that point.
 ECHO.
 SET /P "skill_choice=Do you wish to proceed? (Y/N): "
 IF /I "%skill_choice%"=="Y" (
@@ -507,23 +507,10 @@ ECHO    Save File Location: "%savedir%\Reimagined"
 ECHO    Save File location is chosen based on the most recently updated "Reimagined" folder containing .d2s files.
 ECHO.
 
+SET "backup_choice="
 SET /P "backup_choice=What would you like to do? "
 IF "%backup_choice%"=="1" (
     ECHO.
-    ECHO Backing up save files...
-    TIMEOUT /T 2 >nul
-    ECHO.
-    tar -a -c -f "%backup_file_name%" -C "%savedir%" "Reimagined" >nul 2>&1
-    IF ERRORLEVEL 1 (
-        CALL :ERROR_HANDLER "Error: Failed to create the backup. Please check if the save files exist and try again." BACKUP_SAVE_FILES
-    )
-    IF NOT EXIST "%backup_file_name%" (
-        CALL :ERROR_HANDLER "Backup file was not created. Please check for issues and try again." BACKUP_SAVE_FILES
-    )
-    ECHO Backup completed successfully!
-    ECHO.
-    PAUSE
-    GOTO BACKUP_SAVE_FILES
 ) ELSE IF "%backup_choice%"=="2" (
     START "" "%savedir%\Reimagined Backups"
     GOTO BACKUP_SAVE_FILES
@@ -532,6 +519,40 @@ IF "%backup_choice%"=="1" (
 ) ELSE (
     CALL :ERROR_HANDLER "Invalid choice. Please enter 1, 2 or 3." BACKUP_SAVE_FILES
 )
+
+:: Ensure delayed variable expansion is enabled
+SETLOCAL ENABLEDELAYEDEXPANSION
+:: Check if the backup file already exists
+IF EXIST "%backup_file_name%" (
+    ECHO A backup file already exists.
+    ECHO.
+    SET /P "overwrite_choice=Do you want to overwrite it? (Y/N): "
+
+    :: Validate the input
+    IF /I "!overwrite_choice!"=="Y" (
+        ECHO Overwriting existing backup file...
+    ) ELSE IF /I "!overwrite_choice!"=="N" (
+        CALL :ERROR_HANDLER "Backup operation canceled." BACKUP_SAVE_FILES
+    ) ELSE (
+        CALL :ERROR_HANDLER "Invalid choice. Please enter Y or N." BACKUP_SAVE_FILES
+    )
+)
+:: Disable delayed variable expansion
+ENDLOCAL
+
+:: Perform character backup
+tar -a -c -f "%backup_file_name%" -C "%savedir%" "Reimagined" >nul 2>&1
+IF ERRORLEVEL 1 (
+    CALL :ERROR_HANDLER "Error: Failed to create the backup. Please check if the save files exist and try again." BACKUP_SAVE_FILES
+)
+IF NOT EXIST "%backup_file_name%" (
+    CALL :ERROR_HANDLER "Backup file was not created. Please check for issues and try again." BACKUP_SAVE_FILES
+)
+ECHO Backup completed successfully!
+ECHO.
+PAUSE
+GOTO BACKUP_SAVE_FILES
+
 PAUSE
 GOTO ADVANCED_OPTIONS
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
