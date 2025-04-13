@@ -7,100 +7,26 @@
 :                                                  INITIALISATION                                                    :
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Constants
-:: Set to enabled for debugging, disabled to remove debug output
+:: 0 = enabled, 1 = disabled
 SET "debug=1"
 
 :: find the location of the launcher script
 SET "launcher=%~dp0"
 IF "%launcher:~-1%"=="\" SET "launcher=%launcher:~0,-1%"
 
-:: Check if settings exists
-IF "%debug%"=="0" ECHO Checking if settings file exists & ECHO. & PAUSE
-IF EXIST "%launcher%\settings.txt" (
-    SET "settings=%launcher%\settings.txt"
-    ECHO Welcome back hero...
-    ECHO.
-) ELSE (
-    SET "settings="
-    ECHO Oh greetings stranger, stay a while and listen...
-    ECHO.
-)
-:: Create settings file if it doesn't exist
-:: Set global variables from settings file
-IF "%debug%"=="0" ECHO Proceeding to CREATE_CHECK_SETTINGS & ECHO. & PAUSE
-CALL :CREATE_CHECK_SETTINGS
-TIMEOUT /T 2 >nul
-
-IF "%debug%"=="0" ECHO Locating launcher: "%launcher%" & ECHO. & PAUSE
-
 :: Query the registry for the install location
 FOR /F "usebackq tokens=3*" %%A IN (`REG QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Diablo II Resurrected" /v InstallLocation 2^>nul`) DO (
     @SET "appdir=%%A %%B"
 )
 
-ECHO Looking under the bed for the Dark Wanderer...
-ECHO.
-IF "%debug%"=="0" ECHO Checking for D2R Install Directory and D2R.exe & ECHO. & PAUSE
-:: Verify D2R installation
-IF NOT DEFINED appdir (
-    CALL :ERROR_HANDLER "Diablo II Resurrected is not installed or the registry key is missing. Please ensure a licenced version of the game is installed before trying again." EXIT
-)
-IF NOT EXIST "%appdir%\D2R.exe" (
-    CALL :ERROR_HANDLER "D2R.exe not found in '%appdir%'. Please ensure Diablo II Resurrected is installed correctly." EXIT
-)
-TIMEOUT /T 2 >nul
-
-:: Check if Reimagined is installed already
-ECHO Reimagining D2R...
-ECHO.
-IF "%debug%"=="0" ECHO Verifying Reimagined Folder exists & ECHO. & PAUSE
-CALL :VERIFY_REIMAGINED_FOLDER
-TIMEOUT /T 2 >nul
-
-:: Debugging
-IF "%debug%"=="0" (
-    ECHO.
-    ECHO Now back in initialisation & ECHO. & PAUSE
-    ECHO Custom Save: "%custom_save%"
-    ECHO Save Location: "%save_location%"
-    ECHO.
-    PAUSE
-)
-
-:: Debugging
-IF "%debug%"=="0" (
-    ECHO.
-    CALL :DISPLAY_SETTINGS "%settings%"
-    ECHO.
-    PAUSE
-)
-
-IF "%debug%"=="0" ECHO Checking if we have a custom save location & ECHO. & PAUSE
-IF DEFINED custom_save IF "%custom_save%"=="1" (
-    IF "%debug%"=="0" ECHO No custom save location, proceeding to LOCATE_SAVED_GAMES_DIR & ECHO. & PAUSE
-    ECHO Searching Sanctuary for worthy heroes...
-    CALL :LOCATE_SAVED_GAMES_DIR
-) ELSE (
-    IF DEFINED save_location IF NOT "%save_location%"=="" (
-        IF "%debug%"=="0" ECHO Found a custom save location & ECHO. & PAUSE
-        ECHO Found heroes in the tavern...
-        ECHO.
-        TIMEOUT /T 2 >nul
-        EXIT /B
-    )
-)
-
-:: Debugging
-IF "%debug%"=="0" (
-    ECHO.
-    CALL :DISPLAY_SETTINGS "%settings%"
-    ECHO.
-    PAUSE
-)
-
-IF "%debug%"=="0" ECHO Proceeding to UPDATE_CHECK & ECHO. & PAUSE
-CALL :UPDATE_CHECK
-TIMEOUT /T 2 >nul
+CALL :CREATE_CHECK_SETTINGS :: Check if the settings file exists
+CALL :VERIFY_D2R_INSTALL :: Check Diablo II Resurrected installation
+CALL :VERIFY_REIMAGINED_FOLDER :: Check if Reimagined installation
+CALL :FIND_OR_CREATE_SAVE_DIR :: Find Saved Games location
+CALL :FIND_OR_CREATE_BACKUP_DIR :: Find Backup location
+CALL :UPDATE_CHECK :: Check for Mod and Launcher Updates
+:: Display current value of settings to help debug
+IF "%debug%"=="0" ECHO. & CALL :DISPLAY_SETTINGS "%settings%" & ECHO. & PAUSE
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of initialisation
@@ -110,6 +36,7 @@ TIMEOUT /T 2 >nul
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Main Menu
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO ------------- REIMAGINED BETA LAUNCHER -------------
 ECHO.
@@ -152,6 +79,7 @@ IF "%menu_choice%"=="9" CALL :OPEN_LINK "https://discord.gg/5bbjneJCrr"
 IF /I "%menu_choice%"=="X" EXIT
 
 GOTO MAIN_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Main Menu
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -160,6 +88,7 @@ GOTO MAIN_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Play Reimagined
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CALL :CHECK_7Z_FILES
 CALL :VERIFY_REIMAGINED_FOLDER
 IF "%mod_checked%"=="0" (
@@ -177,6 +106,7 @@ IF "%mod_checked%"=="0" (
     CALL :ERROR_HANDLER "Reimagined mod folder is not found or is empty. Please ensure the mod is installed correctly." INSTALL_UPDATE
 )
 EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Play Reimagined
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -185,6 +115,7 @@ EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Utility to update the Reimagined mod using a 7z file
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CALL :CHECK_7Z_FILES
 CLS
 ECHO.
@@ -235,6 +166,7 @@ IF /I "%install_choice%"=="Y" (
     CALL :ERROR_HANDLER "Invalid choice. Please enter Y or N." INSTALL_UPDATE
 )
 EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Install / Update
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -243,7 +175,9 @@ EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Configuration Menu
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CALL :VERIFY_REIMAGINED_FOLDER
+
 CLS
 ECHO.
 ECHO ------------- CONFIGURATION MENU -------------
@@ -313,6 +247,7 @@ IF /I "%advoption_choice%"=="W" (
 )
 IF /I "%advoption_choice%"=="X" GOTO MAIN_MENU
 CALL :ERROR_HANDLER "Invalid choice. Please try again." CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Advanced Options
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -326,6 +261,7 @@ CALL :ERROR_HANDLER "Invalid choice. Please try again." CONFIGURATION_MENU
     :: GENERATE SHORTCUT (/W BACKUP OPTION)
     :: ADD MORE LAUNCH ARGUMENTS (REGEN SHORTCUT)
 GOTO CONFIGURATION_MENU
+
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Play Options
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -334,6 +270,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Increases player Shared Stash Tabs from 3 to 7
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO ------------- Expanded Shared Stash Tabs -------------
 ECHO.
@@ -432,6 +369,7 @@ IF "%stash_choice%"=="1" (
 )
 PAUSE
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Expanded Stash
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -440,6 +378,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Forces Terror Zones to be a fixed, permanent list of zones
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO.
 ECHO ------------- Forced Terror Zones -------------
@@ -488,6 +427,7 @@ IF /I "%terror_choice%"=="Y" (
 )
 PAUSE
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Forced Terror Zones
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -496,6 +436,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Removes the graphical effect of the Splash Charm (Collin's Charm)
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO.
 ECHO ------------- Splash Charm Graphic Effect Removal -------------
@@ -530,6 +471,7 @@ IF /I "%splash_choice%"=="Y" (
 )
 PAUSE
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Splash Charm Graphic Effect Removal
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -538,6 +480,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Updates characters to gain 2 Skill Points and 8 Attribute Points per level
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO.
 ECHO ------------- Increase Level Up Stats -------------
@@ -579,6 +522,7 @@ IF /I "%skill_choice%"=="Y" (
 )
 PAUSE
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Two Skill Points
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -587,6 +531,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Removes the letterbox effect from the game
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO.
 ECHO ------------- Letterbox Removal -------------
@@ -621,6 +566,7 @@ GOTO CONFIGURATION_MENU
 :: ADD UNINSTALL OPTION
 
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Letterbox Removal
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -629,6 +575,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Unpack game files for faster load times, requires 41GB of free space
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO.
 ECHO ------------- CASC Fastloading -------------
@@ -738,8 +685,10 @@ IF /I "%casc_choice%"=="Y" (
 ) ELSE (
     CALL :ERROR_HANDLER "Invalid choice. Please enter Y or N." CASC_FASTLOADING
 )
+
 PAUSE
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of CASC Fastloading
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -748,6 +697,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Resets modifications to their default values
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
 ECHO.
 ECHO ------------- Reset Advanced Options -------------
@@ -763,6 +713,7 @@ ECHO.
 :: SET VARIABLES TO 1
 
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Reset Modifications
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -771,6 +722,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Toggle the launcher update check on or off
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CALL :GET_FILE_VALUE "%settings%" "launcher_auto_update" launcher_auto_update
 
 IF "%launcher_auto_update%"=="1" (
@@ -781,6 +733,7 @@ IF "%launcher_auto_update%"=="1" (
     CALL :ERROR_HANDLER "Disabled launcher update check on startup." CONFIGURATION_MENU
 )
 GOTO CONFIGURATION_MENU
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Toggle Launcher Update Check
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -789,6 +742,7 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Toggle the mod update check on or off
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CALL :GET_FILE_VALUE "%settings%" "mod_auto_update" mod_auto_update
 
 IF "%mod_auto_update%"=="1" (
@@ -798,7 +752,9 @@ IF "%mod_auto_update%"=="1" (
     CALL :SET_FILE_VALUE "%settings%" "mod_auto_update" "1"
     CALL :ERROR_HANDLER "Disabled mod update check on startup." CONFIGURATION_MENU
 )
+
 GOTO CONFIGURATION_MENU
+
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Toggle Mod Update Check
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -807,9 +763,11 @@ GOTO CONFIGURATION_MENU
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Restore settings from backup
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 CLS
+
 :: Check for backup files and folders
-IF NOT DEFINED d2r_mod_saves CALL :LOCATE_SAVED_GAMES_DIR
+IF NOT DEFINED d2r_mod_saves CALL :FIND_OR_CREATE_SAVE_DIR
 IF NOT EXIST "%backup_location%" (
     ECHO Error: Couldn't find a backup directory.
     CALL :ERROR_HANDLER "Try creating a backup first." BACKUP_FILES
@@ -836,12 +794,17 @@ IF /I "%restore_choice%"=="Y" (
     CALL :ERROR_HANDLER "Invalid choice. Please enter Y or N." RESTORE_SETTINGS_FROM_BACKUP
 )
 
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: End of Restore Settings from Backup
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 :BACKUP_FILES
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Finds the most recently updated Reimagined folder that contains character files, and creates a backup using tar
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 IF NOT DEFINED d2r_mod_saves OR "%d2r_mod_saves%"=="" (
-    CALL :LOCATE_SAVED_GAMES_DIR
+    CALL :FIND_OR_CREATE_SAVE_DIR
 )
 
 :: Initialise backup variables
@@ -960,6 +923,7 @@ IF "%backup_choice%"=="1" (
     ECHO.
     PAUSE
     GOTO BACKUP_FILES
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Backup Save Files
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -967,31 +931,26 @@ IF "%backup_choice%"=="1" (
 :UPDATE_CHECK
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Check whether there are updates available for the launcher or Reimagined
-:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-IF "%debug%"=="0" ECHO Now in UPDATE_CHECK & ECHO. & PAUSE
-
+IF "%debug%"=="0" ECHO Entering UPDATE_CHECK... & ECHO. & PAUSE
 IF "%debug%"=="0" ECHO Initial values, mod: "%mod_auto_update%", launcher: "%launcher_auto_update%" & ECHO. & PAUSE
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 IF NOT DEFINED mod_auto_update (
     IF "%debug%"=="0" ECHO mod auto update not defined, setting now & ECHO. & PAUSE
-    SET "mod_auto_update=0"
     CALL :SET_FILE_VALUE "%settings%" "mod_auto_update" "0"
 ) ELSE (
     IF "%mod_auto_update%"=="" (
         IF "%debug%"=="0" ECHO mod auto update not set, setting now & ECHO. & PAUSE
-        SET "mod_auto_update=0"
         CALL :SET_FILE_VALUE "%settings%" "mod_auto_update" "0"
     )
 )
 
 IF NOT DEFINED launcher_auto_update (
     IF "%debug%"=="0" ECHO launcher auto update not defined, setting now & ECHO. & PAUSE
-    SET "launcher_auto_update=0"
     CALL :SET_FILE_VALUE "%settings%" "launcher_auto_update" "0"
 ) ELSE (
     IF "%launcher_auto_update%"=="" (
         IF "%debug%"=="0" ECHO mod auto update not set, setting now & ECHO. & PAUSE
-        SET "launcher_auto_update=0"
         CALL :SET_FILE_VALUE "%settings%" "launcher_auto_update" "0"
     )
 )
@@ -1001,17 +960,19 @@ IF "%debug%"=="0" ECHO Current values, mod: "%mod_auto_update%", launcher: "%lau
 IF "%mod_auto_update%"=="0" CALL :UPDATE_MOD_CHECK
 IF "%launcher_auto_update%"=="0" CALL :UPDATE_LAUNCHER_CHECK
 
-EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Update Check
+IF "%debug%"=="0" ECHO Exiting UPDATE_CHECK... & ECHO. & PAUSE
+
+EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :UPDATE_MOD_CHECK
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Check Nexus Mods for updates, if available, prompt user to update
+IF "%debug%"=="0" ECHO Entering UPDATE_MOD_CHECK... & ECHO. & PAUSE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-ECHO.
 ECHO Checking for buffs and nerfs...
 ECHO.
 TIMEOUT /T 2 >nul
@@ -1028,20 +989,24 @@ TIMEOUT /T 2 >nul
 :: IF USER CHOOSES NOT TO DOWNLOAD, PROCEED TO MAIN MENU
 
 ECHO Nothing to see here, move along...
-TIMEOUT /T 1 >nul
-EXIT /B
+ECHO.
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Update Mod Check
+IF "%debug%"=="0" ECHO Exiting UPDATE_MOD_CHECK... & ECHO. & PAUSE
+
+TIMEOUT /T 1 >nul
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :UPDATE_LAUNCHER_CHECK
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Check GitHub for the last commit date/time and compare with launcher_version in settings.txt
+IF "%debug%"=="0" ECHO Entering UPDATE_LAUNCHER_CHECK... & ECHO. & PAUSE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-ECHO.
 ECHO Checking Horadric Cube recipes for launcher upgrades...
-TIMEOUT /T 2 >nul
+ECHO.
 
 :: Define the base URL of the GitHub repository
 SET "base_url=https://api.github.com/repos/Vingelis/Reimagined-BETA-Launcher/commits/main"
@@ -1086,89 +1051,98 @@ IF "%debug%"=="0" (
 :: Compare last GitHub commit datetime with launcher_version
 :: If launcher version is older, prompt the user to update
 IF "%github_last_commit_parsed%" GTR "%launcher_version%" (
-    ECHO.
     ECHO The launcher has some juicy upgrades available...
     ECHO.
+    SETLOCAL ENABLEDELAYEDEXPANSION
     SET /P "update_choice=Would you like to update the launcher now? (Y/N): "
-    IF /I "%update_choice%"=="Y" (
+    IF /I "!update_choice!"=="Y" (
+        ENDLOCAL
+        ECHO.
         GOTO PERFORM_LAUNCHER_UPDATE
-    ) ELSE IF /I "%update_choice%"=="N" (
-        CALL :ERROR_HANDLER "Skipping update..." EXIT /B
+    ) ELSE IF /I "!update_choice!"=="N" (
+        ENDLOCAL
+        CALL :ERROR_HANDLER "Skipping update..." MAIN_MENU
     ) ELSE (
+        ENDLOCAL
         CALL :ERROR_HANDLER "Invalid choice. Please enter Y or N." UPDATE_LAUNCHER_CHECK
     )
 ) ELSE (
     :: No updates available, proceed to main menu
-    ECHO.
     ECHO Launcher still Best In Slot...
     ECHO.
 )
-TIMEOUT /T 1 >nul
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: End of Update Launcher Check
+IF "%debug%"=="0" ECHO Exiting UPDATE_LAUNCHER_CHECK... & ECHO. & PAUSE
+
+TIMEOUT /T 2 >nul
 EXIT /B
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :PERFORM_LAUNCHER_UPDATE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Update the launcher by downloading the latest version from GitHub
+IF "%debug%"=="0" ECHO Entering PERFORM_LAUNCHER_UPDATE... & ECHO. & PAUSE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-ECHO.
-ECHO Updating the launcher, sit tight...
+
+ECHO Fetching Deckard Cain, sit tight...
 ECHO.
 
 :: Define the temporary download and extraction locations
-SET "temp_zip=%launcher%\Launcher_Update.zip"
-SET "temp_folder=%launcher%\Launcher_Update"
+SET "update_folder=%launcher%\utils\launcher" :: Utility folder for launcher updates
+SET "update_script=%update_folder%\update_launcher.bat" :: Script that updates the launcher
+SET "temp_zip=%update_folder%\Launcher_Update.zip" :: New launcher zip file
+SET "temp_folder=%update_folder%\Launcher_Update" :: Extracted launcher files
+SET "new_launcher_version=%update_folder%\launcher_version.txt" :: New launcher version
 
 :: Ensure no leftover files from previous updates
 IF EXIST "%temp_zip%" DEL /Q "%temp_zip%"
 IF EXIST "%temp_folder%" RMDIR /S /Q "%temp_folder%"
 
+:: Define the GitHub URL for the latest release
+SET "github_latest_release_url=https://github.com/Vingelis/Reimagined-BETA-Launcher/archive/refs/heads/main.zip"
+
 :: Download the updated launcher zip file
-ECHO Downloading the latest launcher files...
-curl -s -L -o "%temp_zip%" "%update_url%" >nul 2>&1
-TIMEOUT /T 2 >nul
+ECHO Pouring over the sacred Github Texts...
+ECHO.
+curl -s -L -o "%temp_zip%" "%github_latest_release_url%" >nul 2>&1
+IF ERRORLEVEL 1 (
+    CALL :ERROR_HANDLER "Failed to download the updated launcher files. Please check your internet connection or the GitHub URL." MAIN_MENU
+)
 
 :: Check if the download was successful
 IF NOT EXIST "%temp_zip%" (
-    CALL :ERROR_HANDLER "Failed to download the updated launcher files. Please check your internet connection or the update URL." MAIN_MENU
+    CALL :ERROR_HANDLER "Failed to download the updated launcher files. Please check your internet connection or the GitHub URL." MAIN_MENU
 )
 
 :: Extract the downloaded zip file
-ECHO.
-ECHO Extracting the updated launcher files...
+ECHO Decyphering runes with Akara...
 ECHO.
 powershell -Command "Expand-Archive -Path '%temp_zip%' -DestinationPath '%temp_folder%' -Force" >nul 2>&1
+IF ERRORLEVEL 1 (
+    CALL :ERROR_HANDLER "Failed to extract the updated launcher files. Please ensure PowerShell is available and try again." MAIN_MENU
+)
 
 :: Check if the extraction was successful
 IF NOT EXIST "%temp_folder%" (
     CALL :ERROR_HANDLER "Failed to extract the updated launcher files. Please ensure PowerShell is available and try again." MAIN_MENU
 )
 
-:: Move the extracted files to the current launcher folder, overwriting existing files
-ECHO.
-ECHO Updating launcher files...
-ECHO.
-FOR /D %%D IN ("%temp_folder%\*") DO (
-    XCOPY "%%D\*" "%launcher%\" /E /H /C /Y >nul 2>&1
-)
+:: Store new launcher version in temp file for later use
+ECHO launcher_version=%github_last_commit_parsed% > "%new_launcher_version%"
 
-:: Update the launcher_version in settings.txt
-CALL :SET_FILE_VALUE "%settings%" "launcher_version" "%github_last_commit_parsed%"
-
-:: Clean up temporary files
-ECHO Cleaning up temporary files...
-ECHO.
-IF EXIST "%temp_zip%" DEL /Q "%temp_zip%"
-IF EXIST "%temp_folder%" RMDIR /S /Q "%temp_folder%"
-
-:: Confirm update success and restart the launcher
-TIMEOUT /T 2 >nul
-ECHO Update completed successfully! Restarting the launcher...
+:: Schedule the update script to run after the current script exits
+ECHO Updating Horadric Cube recipes... Let Deckard do his thing...
 ECHO.
 PAUSE
-START "" "%~f0"
-EXIT /B
+START "" "%update_script%"
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Update Launcher Process
+IF "%debug%"=="0" ECHO Exiting PERFORM_LAUNCHER_UPDATE ... & ECHO. & PAUSE
+
+EXIT
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1178,7 +1152,9 @@ EXIT /B
 :CHECK_7Z_FILES
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Check for 7z files in the launcher folder
+IF "%debug%"=="0" ECHO Entering CHECK_7Z_FILES... & ECHO. & PAUSE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 SET "file_count=0"
 SET "install_file="
 
@@ -1218,15 +1194,35 @@ IF "%debug%"=="0" (
     ECHO Debug: install_file="%install_file%"
     ECHO Debug: file_count="%file_count%"
 )
-EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Check for 7z files
+IF "%debug%"=="0" ECHO Entering CHECK_7Z_FILES... & ECHO. & PAUSE
+
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-:LOCATE_SAVED_GAMES_DIR
+:FIND_OR_CREATE_SAVE_DIR
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Search for the most recently updated "Reimagined" folder containing .d2s files, ignoring directories named "Backup"
+IF "%debug%"=="0" ECHO Entering FIND_OR_CREATE_SAVE_DIR... & ECHO. & PAUSE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:: Finding save location
+IF "%debug%"=="0" ECHO Checking if we have a custom save location & ECHO. & PAUSE
+IF DEFINED custom_save IF "%custom_save%"=="1" (
+    IF "%debug%"=="0" ECHO No custom save location, proceeding with FIND_OR_CREATE_SAVE_DIR & ECHO. & PAUSE
+    ECHO Searching Sanctuary for worthy heroes...
+    ECHO.
+) ELSE (
+    IF DEFINED save_location IF NOT "%save_location%"=="" (
+        IF "%debug%"=="0" ECHO Found a custom save location, returning to initialisation & ECHO. & PAUSE
+        ECHO Found heroes in the tavern...
+        ECHO.
+        TIMEOUT /T 2 >nul
+        EXIT /B
+    )
+)
 
 :: Recursively search for the most recently updated "Reimagined" folder containing .d2s files
 FOR /F "tokens=*" %%A IN ('powershell -Command "Get-ChildItem -Path $env:USERPROFILE -Recurse -Directory -Filter 'Reimagined' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\Backup(\\|$)' -and (Get-ChildItem -Path $_.FullName -Filter '*.d2s' -File -ErrorAction SilentlyContinue).Count -gt 0 } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName"') DO (
@@ -1234,7 +1230,7 @@ FOR /F "tokens=*" %%A IN ('powershell -Command "Get-ChildItem -Path $env:USERPRO
 )
 
 :: Debugging output
-IF "%debug%"=="0" ECHO Debug: Save Location in LOCATE_SAVED_GAMES_DIR = "%save_location%" & ECHO. & PAUSE
+IF "%debug%"=="0" ECHO Debug: Save Location in FIND_OR_CREATE_SAVE_DIR = "%save_location%" & ECHO. & PAUSE
 
 :: Couldn't find any .d2s files, so create a backup directory in the most likely place
 IF "%save_location%"=="" (
@@ -1249,21 +1245,16 @@ IF "%save_location%"=="" (
         IF /I "%manual_choice%"=="Y" (
             SET /P "usersavelocation=Enter the full path to your preferred directory: "
             IF NOT EXIST "%usersavelocation%" (
-                CALL :ERROR_HANDLER "Error: The specified directory does not exist. Please check the path." LOCATE_SAVED_GAMES_DIR
+                CALL :ERROR_HANDLER "Error: The specified directory does not exist. Please check the path." FIND_OR_CREATE_SAVE_DIR
             )
             SET "save_location=%usersavelocation%"
         ) ELSE (
-            CALL :ERROR_HANDLER "No valid Saved Games directory found. Let's try again..." LOCATE_SAVED_GAMES_DIR
+            CALL :ERROR_HANDLER "No valid Saved Games directory found. Let's try again..." FIND_OR_CREATE_SAVE_DIR
         )
     )
-    ECHO.
-    ECHO Your heroes can rest easy here:
-    ECHO "%save_location%"
-    ECHO.
-    TIMEOUT /T 2 >nul
 )
 
-:: Set savedir to one folder higher than its current value
+:: Find the parent directory of the Reimagined folder
 :: e.g. "C:\Users\YourName\Saved Games\Diablo II Resurrected\mods\Reimagined\" becomes "C:\Users\YourName\Saved Games\Diablo II Resurrected\mods\"
 FOR %%I IN ("%save_location%") DO SET "d2r_mod_saves=%%~dpI"
 :: Remove trailing backslash if it exists to make the path cleaner
@@ -1275,12 +1266,44 @@ IF NOT EXIST "%d2r_mod_saves%" (
 )
 
 :: Debugging output
-IF "%debug%"=="0" (
+IF "%debug%"=="0" ECHO. & ECHO Debug: Trimmed Saved Games Directory = "%d2r_mod_saves%" & ECHO. & PAUSE
+
+::CALL :GET_FILE_VALUE "%settings%" "custom_save" custom_save
+::IF "%debug%"=="0" ECHO Debug: Getting custom save settings: "%custom_save%" & ECHO. & PAUSE
+::IF "%custom_save%"=="1" CALL :SET_FILE_VALUE "%settings%" "save_location" "%save_location%"
+CALL :SET_FILE_VALUE "%settings%" "save_location" "%save_location%"
+IF "%debug%"=="0" ECHO Debug: Setting new save location = "%save_location%" & ECHO. & PAUSE
+
+ECHO Found some heroes, getting them back to town...
+ECHO.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: End of Locate Saved Games Directory
+IF "%debug%"=="0" ECHO Exiting FIND_OR_CREATE_SAVE_DIR... & ECHO. & PAUSE
+
+TIMEOUT /T 2 >nul
+EXIT /B
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:FIND_OR_CREATE_BACKUP_DIR
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: Find or create the backup directory
+IF "%debug%"=="0" ECHO Entering FIND_OR_CREATE_BACKUP_DIR... & ECHO. & PAUSE
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+IF "%debug%"=="0" ECHO Check if we have a custom backup location & ECHO. & PAUSE
+IF DEFINED custom_backup IF "%custom_backup%"=="1" (
+    IF "%debug%"=="0" ECHO No custom backup location, proceeding with FIND_OR_CREATE_BACKUP_DIR & ECHO. & PAUSE
+    ECHO Locating a safe haven for your heroes...
     ECHO.
-    ECHO Debug: Trimmed Saved Games Directory = "%d2r_mod_saves%"
-    ECHO Debug: Locate Saved Games Directory function completed successfully.
-    ECHO.
-    PAUSE
+) ELSE (
+    IF DEFINED backup_location IF NOT "%backup_location%"=="" (
+        IF "%debug%"=="0" ECHO Found a custom backup location, returning to initialisation & ECHO. & PAUSE
+        ECHO Furnishing the hideout...
+        ECHO.
+        TIMEOUT /T 2 >nul
+        EXIT /B
+    )
 )
 
 IF "%backup_location%"=="" (
@@ -1289,33 +1312,70 @@ IF "%backup_location%"=="" (
         IF "%debug%"=="0" ECHO Debug: No Backup folder exists, creating a new one & ECHO. & PAUSE
         MD "%d2r_mod_saves%\Reimagined Backups" >nul 2>&1
         IF ERRORLEVEL 1 (
-            CALL :ERROR_HANDLER "Failed to create backup directory in '%d2r_mod_saves%'. Please check permissions or the path." LOCATE_SAVED_GAMES_DIR
+            CALL :ERROR_HANDLER "Failed to create backup directory in '%d2r_mod_saves%'. Please check permissions or the path." FIND_OR_CREATE_SAVE_DIR
         )
     )
     SET "backup_location=%d2r_mod_saves%\Reimagined Backups"
 )
 
-CALL :GET_FILE_VALUE "%settings%" "custom_save" custom_save
-CALL :GET_FILE_VALUE "%settings%" "custom_backup" custom_backup
+:: Debugging output
+IF "%debug%"=="0" ECHO. & ECHO Debug: backup location = "%backup_location%" & ECHO. & PAUSE
 
-IF "%debug%"=="0" ECHO Debug: Getting custom save and backup settings: "%custom_save%", "%custom_backup%" & ECHO. & PAUSE
-
-:: Set Save location dynamically
-IF "%custom_save%"=="1" CALL :SET_FILE_VALUE "%settings%" "save_location" "%save_location%"
-IF "%debug%"=="0" ECHO Debug: Setting new save location = "%save_location%" & ECHO. & PAUSE
-:: Set backup location dynamically
-IF "%custom_backup%"=="1" CALL :SET_FILE_VALUE "%settings%" "backup_location" "%backup_location%"
+::CALL :GET_FILE_VALUE "%settings%" "custom_backup" custom_backup
+::IF "%debug%"=="0" ECHO Debug: Getting custom backup settings: "%custom_backup%" & ECHO. & PAUSE
+::IF "%custom_backup%"=="1" CALL :SET_FILE_VALUE "%settings%" "backup_location" "%backup_location%"
+CALL :SET_FILE_VALUE "%settings%" "backup_location" "%backup_location%"
 IF "%debug%"=="0" ECHO Debug: Setting new backup location = "%backup_location%" & ECHO. & PAUSE
 
+ECHO Hideout established, heroes can rest easy...
+ECHO.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: End of Find or Create Backup Directory
+IF "%debug%"=="0" ECHO. & ECHO Exiting FIND_OR_CREATE_BACKUP_DIR... & ECHO. & PAUSE
+
+TIMEOUT /T 2 >nul
 EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-:: End of Locate Saved Games Directory
+
+:VERIFY_D2R_INSTALL
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: Verify the Resurrected folder and its contents
+IF "%debug%"=="0" ECHO. & ECHO Entering VERIFY_D2R_INSTALL... & ECHO. & PAUSE
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+ECHO Looking under the bed for the Dark Wanderer...
+ECHO.
+
+IF NOT DEFINED appdir (
+    CALL :ERROR_HANDLER "Diablo II Resurrected is not installed or the registry key is missing. Please ensure a licenced version of the game is installed before trying again." EXIT
+)
+IF NOT EXIST "%appdir%\D2R.exe" (
+    CALL :ERROR_HANDLER "D2R.exe not found in '%appdir%'. Please ensure Diablo II Resurrected is installed correctly." EXIT
+)
+
+ECHO No lurking nightmares found... This time...
+ECHO.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: End of Verify D2R Install
+IF "%debug%"=="0" ECHO. & ECHO Exiting VERIFY_D2R_INSTALL... & ECHO. & PAUSE
+
+TIMEOUT /T 2 >nul
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :VERIFY_REIMAGINED_FOLDER
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Verify the Reimagined folder and its contents
+IF "%debug%"=="0" ECHO Entering VERIFY_REIMAGINED_FOLDER & ECHO. & PAUSE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+ECHO Reimagining Diablo...
+ECHO.
+
+TIMEOUT /T 2 >nul
+
 SET "mod_checked=1"  :: mod isn't considered installed until we check the folder
 IF NOT EXIST "%appdir%\mods\Reimagined\" (
     CALL :ERROR_HANDLER "Looks like Reimagined isn't installed yet. Let's install the mod before proceeding further." INSTALL_UPDATE
@@ -1328,31 +1388,35 @@ IF NOT EXIST "%appdir%\mods\Reimagined\" (
 :: Mod confirmed as installed and not empty
 SET "mod_checked=0"
 
-:: Debugging output
-IF "%debug%"=="0" (
-    ECHO Debug: Reimagined folder exists and is not empty.
-    ECHO.
-)
-EXIT /B
+ECHO Diablo's looking good...
+ECHO.
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Verify Reimagined folder
+IF "%debug%"=="0" ECHO Exiting VERIFY_REIMAGINED_FOLDER & ECHO. & PAUSE
+
+TIMEOUT /T 2 >nul
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :ERROR_HANDLER
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: %1 = Error message, %2 = EXIT (optional)
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 ECHO.
 ECHO %~1
 ECHO.
+
 IF NOT "%~2"=="" (
     PAUSE
     GOTO %~2
 )
-PAUSE
-EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Error Handler
+PAUSE
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :COPY_FILE
@@ -1360,13 +1424,16 @@ EXIT /B
 :: Copy a single file from source to destination
 :: %1 = Source, %2 = Destination
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 copy "%~1" "%~2" >nul 2>&1
+
 IF ERRORLEVEL 1 (
     CALL :ERROR_HANDLER "Failed to copy file from '%~1' to '%~2'." EXIT
 )
-EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Copy File
+EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :COPY_FILES
@@ -1374,31 +1441,42 @@ EXIT /B
 :: Copy files and folders from source to destination
 :: %1 = Source, %2 = Destination
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 xcopy /e /r /y "%~1" "%~2" >nul 2>&1
+
 IF ERRORLEVEL 1 (
     CALL :ERROR_HANDLER "Failed to copy files from '%~1' to '%~2'." EXIT
 )
-EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Copy Files
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :OPEN_LINK
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: %1 = URL
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 START "" "%~1"
-EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Open Link
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :CREATE_CHECK_SETTINGS
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Creates a settings.txt file if it doesn't exist with a pre-determined list of key-value pairs
+IF "%debug%"=="0" ECHO Entering CREATE_CHECK_SETTINGS... & ECHO. & PAUSE
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-IF "%debug%"=="0" ECHO Now in CREATE_CHECK_SETTINGS & ECHO. & PAUSE
-IF "%settings%"=="" (
+
+:: If settings.txt doesn't exist, create it with default values
+IF NOT EXIST "%launcher%\settings.txt" (
+    SET "settings="
+    ECHO.
+    ECHO Oh greetings stranger, stay a while and listen...
+    ECHO.
     SETLOCAL ENABLEDELAYEDEXPANSION
     SET "settings=%launcher%\settings.txt"
     (
@@ -1428,12 +1506,22 @@ IF "%settings%"=="" (
     ) > "!settings!"
     ENDLOCAL & SET "settings=%launcher%\settings.txt"
     IF "%debug%"=="0" ECHO Created new settings file & ECHO. & PAUSE
+) ELSE (
+    SET "settings=%launcher%\settings.txt"
+    ECHO.
+    ECHO Welcome back hero...
+    ECHO.
 )
-IF "%debug%"=="0" ECHO Proceeding to GET_SET_SETTINGS & ECHO. & PAUSE
+
+:: Get settings from file, set environment variables
 CALL :GET_SET_SETTINGS "%settings%"
-EXIT /B
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Create Config File
+IF "%debug%"=="0" ECHO Exiting CREATE_CHECK_SETTINGS... & ECHO. & PAUSE
+
+TIMEOUT /T 2 >nul
+EXIT /B
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :SET_FILE_VALUE
@@ -1442,6 +1530,7 @@ EXIT /B
 :: %1 = File path (e.g., settings.txt)
 :: %2 = Key to update (e.g., launcher_version)
 :: %3 = Value to set (e.g., 20250406, or C:\Path\To\Your\Game)
+IF "%debug%"=="0" ECHO Entering SET_FILE_VALUE... & ECHO. & PAUSE
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :: Ensure the file exists, create it if it doesn't
@@ -1451,15 +1540,27 @@ IF NOT EXIST "%~1" (
     EXIT /B
 )
 
-:: Use a single-line PowerShell command to update or add the key-value pair
-Powershell -NoProfile -Command "((Get-Content '%~1') -replace '^\s*%~2\s*=.*', '%~2=%~3') + ('%~2=%~3' * (-not (Select-String -Path '%~1' -Pattern '^\s*%~2\s*='))) | Set-Content '%~1'"
+:: Step 1: Check if the key exists
+Powershell -NoProfile -Command "if ((Get-Content '%~1') -match '^\s*%~2\s*=') { exit 0 } else { exit 1 }"
+IF ERRORLEVEL 1 (
+    :: Step 2: Key does not exist, append it to the file
+    Powershell -NoProfile -Command "Add-Content -Path '%~1' -Value '%~2=%~3'"
+) ELSE (
+    :: Step 3: Key exists, update it
+    Powershell -NoProfile -Command "(Get-Content '%~1') -replace '^\s*%~2\s*=.*', '%~2=%~3' | Set-Content '%~1'"
+)
+
+:: Remove blank lines from the file
+Powershell -NoProfile -Command "(Get-Content '%~1') | Where-Object { $_.Trim() -ne '' } | Set-Content '%~1'"
 
 :: Set the global variable
 SET "%~2=%~3"
 
-EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Set File Value
+IF "%debug%"=="0" ECHO Exiting SET_FILE_VALUE... & ECHO. & PAUSE
+
+EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :GET_FILE_VALUE
@@ -1468,6 +1569,7 @@ EXIT /B
 :: %1 = File path (e.g., settings.txt)
 :: %2 = Key to search for (e.g., launcher_version)
 :: %3 = Variable to store the result (e.g., launcher_version)
+IF "%debug%"=="0" ECHO Entering GET_FILE_VALUE... & ECHO. & PAUSE
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :: Clear the output variable to avoid retaining a previous value
@@ -1497,17 +1599,20 @@ IF NOT DEFINED %~3 (
     EXIT /B 1
 )
 
-EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Get File Value
+IF "%debug%"=="0" ECHO Exiting GET_FILE_VALUE... & ECHO. & PAUSE
+
+EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :GET_SET_SETTINGS
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Get settings from a text file and set each as an environment variable for the current session
 :: %1 = File path (e.g., settings.txt)
+IF "%debug%"=="0" ECHO Entering GET_SET_SETTINGS... & ECHO. & PAUSE
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-IF "%debug%"=="0" ECHO Now in GET_SET_SETTINGS & ECHO. & PAUSE
+
 :: Check if the file exists
 IF NOT EXIST "%~1" (
     ECHO Error: File "%~1" does not exist.
@@ -1520,15 +1625,18 @@ FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR "=" "%~1"') DO (
     IF "%debug%"=="0" ECHO Setting new variable: %%A = %%B
 )
 
-EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Get and Set Settings
+IF "%debug%"=="0" ECHO Exiting GET_SET_SETTINGS... & ECHO. & PAUSE
+
+EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :DISPLAY_SETTINGS
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Get settings from a text file and output them as readable key-value pairs
 :: %1 = File path (e.g., settings.txt)
+IF "%debug%"=="0" ECHO Entering DISPLAY_SETTINGS... & ECHO. & PAUSE
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :: Check if the file exists
@@ -1542,9 +1650,11 @@ FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR "=" "%~1"') DO (
     ECHO %%A = %%B
 )
 
-EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Display Settings
+IF "%debug%"=="0" ECHO Exiting DISPLAY_SETTINGS... & ECHO. & PAUSE
+
+EXIT /B
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
