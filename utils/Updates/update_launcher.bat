@@ -58,7 +58,7 @@ TIMEOUT /T 2 >nul
 :: Backup the new BETA Launcher.bat file to a temporary file
 SET "temp_beta_launcher_file=%utils_launcher_dir%\temp_BETA_Launcher.bat"
 IF EXIST "%beta_launcher_file%" (
-    COPY "%beta_launcher_file%" "%temp_beta_launcher_file%" /Y >nul
+    TYPE "%beta_launcher_file%" > "%temp_beta_launcher_file%"
     IF ERRORLEVEL 1 (
         ECHO Error: Failed to create a backup of BETA Launcher.bat. Please check file permissions and try again.
         PAUSE
@@ -87,6 +87,18 @@ IF EXIST "%beta_launcher_file%" (
         ECHO Warning: Failed to delete temporary backup file. Please check file permissions and clean up manually.
     )
 	TIMEOUT /T 2 >nul
+)
+
+:: Remove the launcher_version in settings.txt so that it can be updated by the new BETA Launcher.bat
+IF EXIST "%settings_file%" (
+    POWERSHELL -Command "$settingsFile = '%settings_file%'; (Get-Content -Path $settingsFile) -replace '^launcher_version=.*$', 'launcher_version=' | Set-Content -Path $settingsFile;"
+    IF ERRORLEVEL 1 (
+        ECHO Error: Failed to update launcher_version in settings.txt. Please check file permissions and try again.
+        PAUSE
+        EXIT /B 1
+    )
+) ELSE (
+    ECHO Warning: settings.txt not found. Skipping launcher_version update.
 )
 
 :: Clean up temporary files
