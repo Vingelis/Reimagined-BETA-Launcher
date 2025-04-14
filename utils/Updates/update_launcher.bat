@@ -64,7 +64,7 @@ IF EXIST "%beta_launcher_file%" (
         PAUSE
         EXIT /B 1
     )
-    
+    TIMEOUT /T 2 >nul
     :: Delete the new BETA Launcher.bat file
     DEL /Q "%beta_launcher_file%"
     IF ERRORLEVEL 1 (
@@ -72,7 +72,7 @@ IF EXIST "%beta_launcher_file%" (
         PAUSE
         EXIT /B 1
     )
-    
+    TIMEOUT /T 2 >nul
     :: Re-create the BETA Launcher.bat file from the temp file
     COPY "%temp_beta_launcher_file%" "%beta_launcher_file%" /Y >nul
     IF ERRORLEVEL 1 (
@@ -80,24 +80,13 @@ IF EXIST "%beta_launcher_file%" (
         PAUSE
         EXIT /B 1
     )
-    
+    TIMEOUT /T 2 >nul
     :: Delete the temp file
     DEL /Q "%temp_beta_launcher_file%"
     IF ERRORLEVEL 1 (
         ECHO Warning: Failed to delete temporary backup file. Please check file permissions and clean up manually.
     )
-)
-
-:: Update the launcher_version in settings.txt using PowerShell
-IF EXIST "%settings_file%" (
-    POWERSHELL -Command "$settingsFile = '%settings_file%'; (Get-Content -Path $settingsFile) -replace '^launcher_version=.*$', 'launcher_version=' | Set-Content -Path $settingsFile;"
-    IF ERRORLEVEL 1 (
-        ECHO Error: Failed to update launcher_version in settings.txt. Please check file permissions and try again.
-        PAUSE
-        EXIT /B 1
-    )
-) ELSE (
-    ECHO Warning: settings.txt not found. Skipping launcher_version update.
+	TIMEOUT /T 2 >nul
 )
 
 :: Clean up temporary files
