@@ -55,6 +55,38 @@ IF ERRORLEVEL 1 (
     EXIT /B 1
 )
 TIMEOUT /T 2 >nul
+:: Backup the new BETA Launcher.bat file to a temporary file
+SET "temp_beta_launcher_file=%utils_launcher_dir%\temp_BETA_Launcher.bat"
+IF EXIST "%beta_launcher_file%" (
+    COPY "%beta_launcher_file%" "%temp_beta_launcher_file%" /Y >nul
+    IF ERRORLEVEL 1 (
+        ECHO Error: Failed to create a backup of BETA Launcher.bat. Please check file permissions and try again.
+        PAUSE
+        EXIT /B 1
+    )
+    
+    :: Delete the new BETA Launcher.bat file
+    DEL /Q "%beta_launcher_file%"
+    IF ERRORLEVEL 1 (
+        ECHO Error: Failed to delete old BETA Launcher.bat. Please check file permissions and try again.
+        PAUSE
+        EXIT /B 1
+    )
+    
+    :: Re-create the BETA Launcher.bat file from the temp file
+    COPY "%temp_beta_launcher_file%" "%beta_launcher_file%" /Y >nul
+    IF ERRORLEVEL 1 (
+        ECHO Error: Failed to restore BETA Launcher.bat from backup. Please check file permissions and try again.
+        PAUSE
+        EXIT /B 1
+    )
+    
+    :: Delete the temp file
+    DEL /Q "%temp_beta_launcher_file%"
+    IF ERRORLEVEL 1 (
+        ECHO Warning: Failed to delete temporary backup file. Please check file permissions and clean up manually.
+    )
+)
 
 :: Update the launcher_version in settings.txt using PowerShell
 IF EXIST "%settings_file%" (
