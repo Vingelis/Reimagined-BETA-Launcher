@@ -19,9 +19,9 @@ FOR /F "usebackq tokens=3*" %%A IN (`REG QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6
     @SET "appdir=%%A %%B"
 )
 
-CALL :CREATE_CHECK_SETTINGS :: Check if the settings file exists
+CALL :CREATE_CHECK_SETTINGS :: Check if the settings file exists, if not, create it
 CALL :VERIFY_D2R_INSTALL :: Check Diablo II Resurrected installation
-CALL :VERIFY_REIMAGINED_FOLDER :: Check if Reimagined installation
+CALL :VERIFY_REIMAGINED_FOLDER :: Check Reimagined installation
 CALL :FIND_OR_CREATE_SAVE_DIR :: Find Saved Games location
 CALL :FIND_OR_CREATE_BACKUP_DIR :: Find Backup location
 CALL :UPDATE_CHECK :: Check for Mod and Launcher Updates
@@ -1088,17 +1088,19 @@ IF "%debug%"=="0" ECHO Entering PERFORM_LAUNCHER_UPDATE... & ECHO. & PAUSE
 
 ECHO Fetching Deckard Cain, sit tight...
 ECHO.
+TIMEOUT /T 2 >nul
 
-:: Define the temporary download and extraction locations
-SET "update_folder=%launcher%\utils\launcher" :: Utility folder for launcher updates
-SET "update_script=%update_folder%\update_launcher.bat" :: Script that updates the launcher
-SET "temp_zip=%update_folder%\Launcher_Update.zip" :: New launcher zip file
-SET "temp_folder=%update_folder%\Launcher_Update" :: Extracted launcher files
-SET "new_launcher_version=%update_folder%\launcher_version.txt" :: New launcher version
+SET "utils_launcher_dir=%launcher%\utils\Updates"
 
-:: Ensure no leftover files from previous updates
-IF EXIST "%temp_zip%" DEL /Q "%temp_zip%"
-IF EXIST "%temp_folder%" RMDIR /S /Q "%temp_folder%"
+:: Clean the Updates folder before checking for updates
+IF EXIST "%utils_launcher_dir%" (
+    RMDIR /S /Q "%utils_launcher_dir%" >nul 2>&1
+    MD "%utils_launcher_dir%" >nul 2>&1
+    IF ERRORLEVEL 1 (
+        CALL :ERROR_HANDLER "Failed to clear or recreate the utils_launcher_dir. Please check permissions or the path." MAIN_MENU
+    )
+)
+TIMEOUT /T 2 >nul
 
 :: Define the GitHub URL for the latest release
 SET "github_latest_release_url=https://github.com/Vingelis/Reimagined-BETA-Launcher/archive/refs/heads/main.zip"
@@ -1110,6 +1112,7 @@ curl -s -L -o "%temp_zip%" "%github_latest_release_url%" >nul 2>&1
 IF ERRORLEVEL 1 (
     CALL :ERROR_HANDLER "Failed to download the updated launcher files. Please check your internet connection or the GitHub URL." MAIN_MENU
 )
+TIMEOUT /T 2 >nul
 
 :: Check if the download was successful
 IF NOT EXIST "%temp_zip%" (
@@ -1123,6 +1126,7 @@ powershell -Command "Expand-Archive -Path '%temp_zip%' -DestinationPath '%temp_f
 IF ERRORLEVEL 1 (
     CALL :ERROR_HANDLER "Failed to extract the updated launcher files. Please ensure PowerShell is available and try again." MAIN_MENU
 )
+TIMEOUT /T 2 >nul
 
 :: Check if the extraction was successful
 IF NOT EXIST "%temp_folder%" (
@@ -1133,10 +1137,10 @@ IF NOT EXIST "%temp_folder%" (
 ECHO launcher_version=%github_last_commit_parsed% > "%new_launcher_version%"
 
 :: Schedule the update script to run after the current script exits
-ECHO Updating Horadric Cube recipes... Let Deckard do his thing...
+ECHO Proceeding to update Horadric Cube recipes... Let Deckard do his thing...
 ECHO.
 PAUSE
-START "" "%update_script%"
+CALL :UPDATE_LAUNCHER_SCRIPT
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of Update Launcher Process
@@ -1659,6 +1663,145 @@ EXIT /B
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: End of subroutines
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:UPDATE_LAUNCHER_SCRIPT
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: Create a temporary script that performs the launcher update, and deletes itself when finished
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET "temp_update_script=%launcher%\utils\Updates\update_launcher.bat"
+(
+    ECHO @ECHO OFF
+    ECHO ECHO.
+    ECHO ECHO Summoning Update Wizard...
+    ECHO ECHO.
+    ECHO ECHO TIMEOUT /T 2 >nul
+
+    :: Define paths
+    :: Launcher update utility files
+    ECHO SET "utils_launcher_dir=%~dp0"
+    ECHO SET "temp_folder=%utils_launcher_dir%\Launcher_Update"
+    ECHO SET "temp_zip=%utils_launcher_dir%\Launcher_Update.zip"
+    ECHO SET "version_file=%utils_launcher_dir%\launcher_version.txt"
+
+    :: Launcher files
+    ECHO SET "launcher_dir=%~dp0..\.."
+    ECHO SET "settings_file=%launcher_dir%\settings.txt"
+    ECHO SET "beta_launcher_file=%launcher_dir%\BETA Launcher.bat"
+
+    :: Ensure the main launcher script is no longer running
+    ECHO :WAIT_FOR_LAUNCHER_EXIT
+    ECHO TASKLIST | FIND /I "BETA Launcher.bat" >nul
+    ECHO IF NOT ERRORLEVEL 1 (
+    ECHO     TIMEOUT /T 2 >nul
+    ECHO     GOTO WAIT_FOR_LAUNCHER_EXIT
+    ECHO )
+
+    :: Check if the update files exist
+    ECHO IF NOT EXIST "%temp_zip%" (
+    ECHO     ECHO Error: Update package not found. Aborting update.
+    ECHO     PAUSE
+    ECHO     EXIT /B 1
+    ECHO )
+
+    ECHO IF NOT EXIST "%temp_folder%" (
+    ECHO     ECHO Error: Extracted update folder not found. Aborting update.
+    ECHO     PAUSE
+    ECHO     EXIT /B 1
+    ECHO )
+
+    :: Apply the update by copying files
+    ECHO ECHO Reciting the update incantation... 
+    ECHO ECHO.
+    :: Delete the old BETA Launcher.bat file if it exists
+    ECHO IF EXIST "%beta_launcher_file%" (
+    ECHO     DEL /Q "%beta_launcher_file%"
+    ECHO     IF ERRORLEVEL 1 (
+    ECHO         ECHO Error: Failed to delete old BETA Launcher.bat. Please check file permissions and try again.
+    ECHO         PAUSE
+    ECHO         EXIT /B 1
+    ECHO     )
+    ECHO )
+    ECHO TIMEOUT /T 2 >nul
+    ECHO XCOPY "%temp_folder%\Reimagined-BETA-Launcher-main\*" "%launcher_dir%\" /E /H /C /Y >nul 2>&1
+    ECHO IF ERRORLEVEL 1 (
+    ECHO     ECHO Error: Failed to update launcher files. Please check file permissions and try again.
+    ECHO     PAUSE
+    ECHO     EXIT /B 1
+    ECHO )
+    ECHO TIMEOUT /T 2 >nul
+
+    :: Update launcher_version in settings.txt
+    ECHO IF EXIST "%version_file%" (
+    ECHO     FOR /F "tokens=*" %%A IN ('TYPE "%version_file%"') DO SET "new_version=%%A"
+    ECHO     IF NOT DEFINED new_version (
+    ECHO         ECHO Error: Failed to read launcher version from "%version_file%".
+    ECHO         PAUSE
+    ECHO         EXIT /B 1
+    ECHO     )
+    ECHO     ECHO Transmuting Horadric Cube...
+    ECHO     ECHO.
+    ECHO     Powershell -NoProfile -Command "(Get-Content '%settings_file%') -replace '^\s*launcher_version\s*=.*', 'launcher_version=%new_version%' | Set-Content '%settings_file%'"
+    ECHO     IF ERRORLEVEL 1 (
+    ECHO         ECHO Error: Failed to update launcher_version in settings.txt.
+    ECHO         PAUSE
+    ECHO         EXIT /B 1
+    ECHO     )
+    ECHO     ECHO Transmutation successful...
+    ECHO     ECHO.
+    ECHO ) ELSE (
+    ECHO     ECHO Error: Version file "%version_file%" not found. Skipping version update.
+    ECHO     ECHO.
+    ECHO )
+    ECHO TIMEOUT /T 2 >nul
+
+    :: Clean up temporary files
+    ECHO ECHO Now to clean up the Cube...
+    ECHO ECHO.
+
+    :: Delete temporary files and folders
+    ECHO IF EXIST "%temp_zip%" DEL /Q "%temp_zip%"
+    ECHO IF EXIST "%temp_folder%" RMDIR /S /Q "%temp_folder%"
+    ECHO IF EXIST "%version_file%" DEL /Q "%version_file%"
+    ECHO TIMEOUT /T 2 >nul
+
+    :: Verify cleanup success
+    ECHO FOR %%F IN ("%temp_zip%" "%temp_folder%" "%version_file%") DO (
+    ECHO     IF EXIST %%F (
+    ECHO         ECHO Error: Failed to delete %%F. Please check file permissions and try again.
+    ECHO         PAUSE
+    ECHO         EXIT /B 1
+    ECHO     )
+    ECHO )
+
+    ECHO ECHO Cube has been emptied of its contents...
+    ECHO ECHO.
+    ECHO TIMEOUT /T 2 >nul
+
+    :: Confirm update success
+    ECHO ECHO Looks like everything went well...
+    ECHO ECHO.
+    ECHO ECHO Restarting the launcher...
+    ECHO ECHO.
+    ECHO TIMEOUT /T 2 >nul
+
+    :: Restart the launcher
+    ECHO PUSHD "%launcher_dir%"
+    ECHO START "" "BETA Launcher.bat"
+    ECHO POPD
+
+    ECHO EXIT & DEL /Q "%temp_update_script%"
+    ECHO IF ERRORLEVEL 1 (
+    ECHO     ECHO Warning: Failed to delete temporary script "%temp_update_script%". Please delete it manually.
+    ECHO )
+) > "%temp_update_script%"
+
+START "" "%temp_update_script%"
+EXIT /B
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: End of Update Launcher Script
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
