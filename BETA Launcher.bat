@@ -136,6 +136,12 @@ SET /P "install_choice=Would you like to install this version now? (Y/N): "
     :: PROCEED WITH INSTALLATION
 
 IF /I "%install_choice%"=="Y" (
+    IF EXIST "%appdir%\mods\Reimagined" (
+        ECHO.
+        ECHO Removing old mod files
+        RMDIR /s /q "%appdir%\mods\Reimagined"
+        ECHO.
+    )
     :: INSTALL REIMAGINED
     :INSTALL_REIMAGINED
         :: Ensure the install_file variable is correctly expanded
@@ -608,7 +614,6 @@ IF /I "%casc_choice%"=="Y" (
         ECHO Moving extracted game files to Reimagined mod folder...
         move /Y "%appdir%\casctemp\data\data" "%appdir%\mods\Reimagined\Reimagined.mpq\data" >nul 2>&1
         rmdir /s /q "%appdir%\casctemp" >nul 2>&1
-        DEL "%launcher%\*" /Q >nul 2>&1
         ECHO.
         ECHO Cleaning up the mess...
         TIMEOUT /T 2 >nul
